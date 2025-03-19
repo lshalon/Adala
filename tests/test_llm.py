@@ -1,82 +1,85 @@
-import pytest
 import asyncio
+
 import pandas as pd
+import pytest
 from pydantic import BaseModel, Field
+
 from adala.runtimes import (
-    LiteLLMChatRuntime,
     AsyncLiteLLMChatRuntime,
     AsyncLiteLLMVisionRuntime,
+    LiteLLMChatRuntime,
+    OpenRouterChatRuntime
 )
-from adala.utils.parse import split_message_into_chunks, MessageChunkType
+from adala.utils.parse import MessageChunkType, split_message_into_chunks
 
 
 @pytest.mark.vcr
 def test_llm_sync():
-    runtime = LiteLLMChatRuntime()
+    for runtime in [OpenRouterChatRuntime(), LiteLLMChatRuntime()]: 
 
-    # test plaintext success
+        # test plaintext success
 
-    result = runtime.get_llm_response(
-        messages=[
-            {"role": "user", "content": "return the word Banana with exclamation mark"}
-        ],
-    )
-    expected_result = "Banana!"
-    assert result == expected_result
+        result = runtime.get_llm_response(
+            messages=[
+                {"role": "user", "content": "return the word Banana with exclamation mark"}
+            ],
+        )
+        expected_result = "Banana!"
+        assert result == expected_result
 
-    # test structured success with extra unused variables
+        # test structured success with extra unused variables
 
-    class Output(BaseModel):
-        name: str = Field(..., description="name:")
-        age: str = Field(..., description="age:")
+        class Output(BaseModel):
+            name: str = Field(..., description="name:")
+            age: str = Field(..., description="age:")
 
-    result = runtime.record_to_record(
-        record={"input_name": "Carla", "input_age": 25},
-        input_template="My name is {input_name} and I am {input_age:02d} years old with {brackets:.2f} and {brackets2:invalid_format_spec} and {input_name:invalid_format_spec}.",
-        instructions_template="",
-        response_model=Output,
-    )
+        result = runtime.record_to_record(
+            record={"input_name": "Carla", "input_age": 25},
+            input_template="My name is {input_name} and I am {input_age:02d} years old with {brackets:.2f} and {brackets2:invalid_format_spec} and {input_name:invalid_format_spec}.",
+            instructions_template="",
+            response_model=Output,
+        )
 
-    # note age coerced to string
-    expected_result = {
-        "name": "Carla",
-        "age": "25",
-        "_prompt_tokens": 86,
-        "_completion_tokens": 10,
-        "_prompt_cost_usd": 1.29e-05,
-        "_completion_cost_usd": 6e-06,
-        "_total_cost_usd": 1.89e-05,
-    }
-    assert result["name"] == expected_result["name"]
-    assert result["age"] == expected_result["age"]
-    assert isinstance(result["_prompt_tokens"], int)
-    assert isinstance(result["_completion_tokens"], int)
-    assert isinstance(result["_prompt_cost_usd"], float)
-    assert isinstance(result["_completion_cost_usd"], float)
-    assert isinstance(result["_total_cost_usd"], float)
+        # note age coerced to string
+        expected_result = {
+            "name": "Carla",
+            "age": "25",
+            "_prompt_tokens": 86,
+            "_completion_tokens": 10,
+            "_prompt_cost_usd": 1.29e-05,
+            "_completion_cost_usd": 6e-06,
+            "_total_cost_usd": 1.89e-05,
+        }
+        assert result["name"] == expected_result["name"]
+        assert result["age"] == expected_result["age"]
+        assert isinstance(result["_prompt_tokens"], int)
+        assert isinstance(result["_completion_tokens"], int)
+        assert isinstance(result["_prompt_cost_usd"], float)
+        assert isinstance(result["_completion_cost_usd"], float)
+        assert isinstance(result["_total_cost_usd"], float)
 
-    # test structured failure
+        # test structured failure
 
-    runtime.api_key = "fake_api_key"
+        runtime.api_key = "fake_api_key"
 
-    result = runtime.record_to_record(
-        record={"input_name": "Carla", "input_age": 25},
-        input_template="My name is {input_name} and I am {input_age} years old.",
-        instructions_template="",
-        response_model=Output,
-    )
+        result = runtime.record_to_record(
+            record={"input_name": "Carla", "input_age": 25},
+            input_template="My name is {input_name} and I am {input_age} years old.",
+            instructions_template="",
+            response_model=Output,
+        )
 
-    expected_result = {
-        "_adala_error": True,
-        "_adala_message": "AuthenticationError",
-        "_adala_details": "litellm.AuthenticationError: AuthenticationError: OpenAIException - Error code: 401 - {'error': {'message': 'Incorrect API key provided: fake_api_key. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}",
-        "_prompt_tokens": 0,
-        "_completion_tokens": 0,
-        "_prompt_cost_usd": 0,
-        "_completion_cost_usd": 0.0,
-        "_total_cost_usd": 0,
-    }
-    assert result == expected_result
+        expected_result = {
+            "_adala_error": True,
+            "_adala_message": "AuthenticationError",
+            "_adala_details": "litellm.AuthenticationError: AuthenticationError: OpenAIException - Error code: 401 - {'error': {'message': 'Incorrect API key provided: fake_api_key. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}",
+            "_prompt_tokens": 0,
+            "_completion_tokens": 0,
+            "_prompt_cost_usd": 0,
+            "_completion_cost_usd": 0.0,
+            "_total_cost_usd": 0,
+        }
+        assert result == expected_result
 
 
 @pytest.mark.vcr

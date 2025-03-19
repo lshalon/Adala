@@ -1,19 +1,20 @@
 import asyncio
 import logging
 import traceback
+from typing import Any, Dict, List, Optional, Tuple, Type
+
 import litellm
+from instructor.client import AsyncInstructor, Instructor
+from instructor.exceptions import IncompleteOutputException, InstructorRetryException
 from litellm import token_counter
-from collections import defaultdict
-from typing import Any, Dict, List, Type, Optional, Tuple
-from pydantic import BaseModel, Field
-from pydantic_core import to_jsonable_python
 from litellm.types.utils import Usage
 from litellm.utils import trim_messages
-from tenacity import Retrying, AsyncRetrying
-from instructor.exceptions import InstructorRetryException, IncompleteOutputException
-from instructor.client import Instructor, AsyncInstructor
-from adala.utils.parse import MessagesBuilder, MessageChunkType
+from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
+from tenacity import AsyncRetrying, Retrying
+
 from adala.utils.exceptions import ConstrainedGenerationError
+from adala.utils.parse import MessageChunkType, MessagesBuilder
 from adala.utils.types import debug_time_it
 
 logger = logging.getLogger(__name__)

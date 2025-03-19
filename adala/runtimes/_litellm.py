@@ -1,68 +1,42 @@
-import asyncio
 import logging
 import traceback
-from openai import OpenAI, AsyncOpenAI
-from collections import defaultdict
 from typing import (
     Any,
     Dict,
     List,
     Optional,
     Type,
-    Union,
-    Literal,
-    TypedDict,
-    Iterable,
-    Generator,
 )
-from functools import cached_property
-from enum import Enum
+
+import instructor
 import litellm
 from litellm.exceptions import (
     AuthenticationError,
-    ContentPolicyViolationError,
-    BadRequestError,
-    NotFoundError,
-    APIConnectionError,
 )
-from litellm.types.utils import Usage
-import instructor
-from instructor.exceptions import InstructorRetryException, IncompleteOutputException
-import traceback
-from adala.runtimes.base import CostEstimate
-from adala.utils.exceptions import ConstrainedGenerationError
-from adala.utils.internal_data import InternalDataFrame
-from adala.utils.parse import (
-    parse_template,
-    partial_str_format,
-    TemplateChunks,
-    MessageChunkType,
-)
-from adala.utils.llm_utils import (
-    run_instructor_with_payload,
-    run_instructor_with_payloads,
-    arun_instructor_with_payload,
-    arun_instructor_with_payloads,
-    run_instructor_with_messages,
-    arun_instructor_with_messages,
-)
-from adala.utils.model_info_utils import (
-    match_model_provider_string,
-    NoModelsFoundError,
-    _estimate_cost,
-)
-
-from pydantic import ConfigDict, field_validator, BaseModel
-from pydantic_core import to_jsonable_python
+from openai import AsyncOpenAI, OpenAI
+from pydantic import BaseModel, ConfigDict, field_validator
 from rich import print
 from tenacity import (
     AsyncRetrying,
     Retrying,
-    retry_if_not_exception_type,
     stop_after_attempt,
-    wait_random_exponential,
 )
-from pydantic_core._pydantic_core import ValidationError
+
+from adala.runtimes.base import CostEstimate
+from adala.utils.internal_data import InternalDataFrame
+from adala.utils.llm_utils import (
+    arun_instructor_with_payloads,
+    run_instructor_with_payload,
+)
+from adala.utils.model_info_utils import (
+    NoModelsFoundError,
+    _estimate_cost,
+    match_model_provider_string,
+)
+from adala.utils.parse import (
+    MessageChunkType,
+    partial_str_format,
+)
 
 from .base import AsyncRuntime, Runtime
 
@@ -134,7 +108,7 @@ class InstructorClientMixin(BaseModel):
     @property
     def client(self):
         if self.provider == "Custom":
-            logger.info(f"Custom provider: using OpenAI client.")
+            logger.info("Custom provider: using OpenAI client.")
             return instructor.from_openai(
                 self._openai_client(api_key=self.api_key, base_url=self.base_url),
                 mode=instructor.Mode(self.instructor_mode),
@@ -177,7 +151,7 @@ class InstructorClientMixin(BaseModel):
             logger.info(
                 f"Model {model} not found in litellm model map for provider {self.provider}. This is likely a single-model deployment."
             )
-        except Exception as e:
+        except Exception:
             logger.exception(
                 f"(1/2) Failed to get canonical model provider string for {model}"
             )
@@ -189,7 +163,7 @@ class InstructorClientMixin(BaseModel):
                 f"Model {model} not found in litellm model map for provider {self.provider}. This is likely a custom model."
             )
             return model
-        except Exception as e:
+        except Exception:
             logger.exception(
                 f"(2/2) Failed to get canonical model provider string for {model}"
             )
